@@ -10,8 +10,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const response = await fetch("/activities");
       const activities = await response.json();
 
-      // Clear loading message
+      // Clear loading message and dropdown
       activitiesList.innerHTML = "";
+      activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
 
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
@@ -20,11 +21,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
+        // build participants list markup with delete icon
+        let participantsMarkup = '';
+        if (details.participants && details.participants.length > 0) {
+          participantsMarkup = `<p><strong>Participants:</strong></p>\n                <ul class=\"participants-list\">\n                  ${details.participants.map(p => `
+                    <li class=\"participant-item\">${p} <span class=\"delete-participant\" title=\"Remove participant\" data-activity=\"${encodeURIComponent(name)}\" data-email=\"${encodeURIComponent(p)}\">&#128465;</span></li>
+                  `).join('')}\n                </ul>`;
+        } else {
+          participantsMarkup = `<p><strong>Participants:</strong> <em>None yet</em></p>`;
+        }
+
         activityCard.innerHTML = `
           <h4>${name}</h4>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          ${participantsMarkup}
         `;
 
         activitiesList.appendChild(activityCard);
@@ -34,6 +46,30 @@ document.addEventListener("DOMContentLoaded", () => {
         option.value = name;
         option.textContent = name;
         activitySelect.appendChild(option);
+
+        // Add event listeners for delete icons
+        const deleteIcons = activityCard.querySelectorAll('.delete-participant');
+        deleteIcons.forEach(icon => {
+          icon.addEventListener('click', async (e) => {
+            const activityName = decodeURIComponent(icon.getAttribute('data-activity'));
+            const email = decodeURIComponent(icon.getAttribute('data-email'));
+            if (!confirm(`Remove ${email} from ${activityName}?`)) return;
+            try {
+              const response = await fetch(`/activities/${encodeURIComponent(activityName)}/unregister?email=${encodeURIComponent(email)}`, {
+                method: 'POST',
+              });
+              const result = await response.json();
+              if (response.ok) {
+                // Refresh activities list
+                fetchActivities();
+              } else {
+                alert(result.detail || 'Failed to remove participant.');
+              }
+            } catch (error) {
+              alert('Failed to remove participant.');
+            }
+          });
+        });
       });
     } catch (error) {
       activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
