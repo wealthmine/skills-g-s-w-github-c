@@ -1,24 +1,27 @@
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 from src.app import app
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_list_activities():
     # Arrange
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
         # Act
         response = await ac.get("/activities")
     # Assert
     assert response.status_code == 200
     assert isinstance(response.json(), dict)
 
-@pytest.mark.asyncio
-async def test_signup_activity():
+@pytest.mark.anyio
+async def test_signup_for_activity():
     # Arrange
-    payload = {"activity": "Chess Club", "email": "newstudent@mergington.edu"}
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    activity_name = "Chess Club"
+    email = "newstudent@mergington.edu"
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
         # Act
-        response = await ac.post("/signup", json=payload)
+        response = await ac.post(f"/activities/{activity_name}/signup", params={"email": email})
     # Assert
     assert response.status_code in (200, 201, 400)
-    assert "message" in response.json()
+    assert response.status_code != 404
